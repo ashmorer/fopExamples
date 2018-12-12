@@ -1,0 +1,47 @@
+#lang ivy1.3
+
+#define red/black node types and colour field to receive
+type node
+type colour = {0,r,b}
+
+#Give colours to the processes
+relation black(X:node)
+relation red(X:node)
+
+#define left/right
+individual left(X:node) : node
+individual right(X:node): node
+
+#axiomatize left/right
+axiom black(X) <-> ~red(X)  #at most one colour
+axiom black(X) | red(X)     #at least one colour
+axiom black(X) <-> (red(left(X)) & red(right(X)))
+axiom red(X) <-> (black(left(X)) & black(right(X)))
+
+#axiom red(X) -> ~red(right(X))
+
+
+#give var field to r/b nodes
+individual var(X:node) : colour
+
+after init
+{
+    var(X) := 0;
+}
+
+action t(n1:node,n2:node) = {
+    assume right(n1)=n2;
+    if(black(n1))
+    {
+        var(n2) := r
+    }
+    else
+    {
+        var(n2) := b
+    }
+}
+
+export t
+
+#Safety property
+conjecture red(X) -> var(X)~=b

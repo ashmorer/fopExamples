@@ -1,0 +1,66 @@
+#lang ivy1.3
+
+type node
+type colour = {0,r,b}
+
+axiom 0~=r & 0~=b & r~=b
+
+#Give colours to the processes
+relation black(X:node)
+relation red(X:node)
+
+#define left/right
+individual left(X:node) : node
+individual right(X:node): node
+
+#give var field to r/b nodes
+individual var(X:node) : colour
+
+
+after init
+{
+    var(X) := 0;
+}
+
+action t(n1:node,n2:node) = {
+    assume right(n1)=n2;
+    if(black(n1))
+    {
+        var(n2) := r
+    }
+    else
+    {
+        var(n2) := b
+    }
+}
+
+#Do not export the uninterpreted t.
+#export t
+
+action trRed(p:node, q:node) = 
+{
+    #limit ourselves to small models
+    assume N=p | N=left(p) | N=right(p) | N=q;
+    assume red(N) <-> ~black(N);
+    assume red(p) -> black(right(p));
+    
+    assume red(q);
+    call t(p,right(p));
+}
+
+action trBlack(p:node, q:node) = 
+{
+    #limit ourselves to small models
+    assume N=p | N=left(p) | N=right(p) | N=q;
+    assume red(N) <-> ~black(N);
+    assume red(p) -> black(right(p));
+    
+    assume black(q);
+    call t(p,right(p));
+}
+
+export trRed
+export trBlack
+
+#Safety property
+conjecture [safety] red(X) -> var(X)~=b

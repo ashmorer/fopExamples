@@ -1,0 +1,97 @@
+#lang ivy1.3
+
+
+################################################################################
+#
+# A module for axiomatizing a total order
+#
+################################################################################
+
+module total_order(r) = 
+{
+    axiom r(X,X)                        #reflexivity
+    axiom r(X,Y) & r(Y,Z) -> r(X,Z)     #transitivity
+    axiom r(X,Y) & r(Y,X) -> X = Y      #anti-symmetry
+    axiom r(X,Y) | r(Y,X)               #total order
+}
+
+
+################################################################################
+#
+# A module for axiomatizing a ring topology
+#
+################################################################################
+
+module ring_topology(carrier) = 
+{
+    relation btw(X:carrier,Y:carrier,Z:carrier)
+    relation next(X:carrier,Y:carrier)
+    
+    axiom btw(X,Y,Z) -> btw(Y,Z,X)
+    axiom btw(X,Y,Z) -> ~btw(X,Z,Y)
+    axiom X~=Y & X~=Z & Y~=Z -> (btw(X,Y,Z) | btw(X,Z,Y))
+    axiom btw(W,X,Y) & btw(W,Y,Z) -> btw(W,X,Z)
+    
+    axiom next(X,Y) <-> (Z~=X & Z~=Y -> btw(X,Y,Z))
+}
+
+
+
+################################################################################
+#
+# Types, relations and functions describing states
+#
+################################################################################
+
+type node
+type id
+
+#Put nodes on a ring
+instantiate ring: ring_topology(node)
+
+#Put a total order on ids
+relation le(X:id, Y:id)
+instantiate total_order(le)
+
+#Get personal id idn and comparison id comp.
+individual idn(X:node) : id
+individual comp(X:node): id
+
+#leader relation is true exactly when idn=comp
+relation leader(N:node)
+axiom leader(N) <-> idn(N) = comp(N)
+
+
+#initial state --> 1) ids unique, 2) id>comp all the time
+
+
+
+################################################################################
+#
+# Protocol description
+#
+# Two action: send and receive
+#
+################################################################################
+
+action trLoc = {
+    local n1:node, n2:node {
+        assume ring.next(n1,n2);
+        if le(idn(n1),comp(n1))
+        {
+            #id(n1)<=comp(n1), pass comp(n1)
+            comp(n2) := comp(n1);
+        }
+        else
+        {
+            #id(n1)>comp(n1), pass idn(n1)
+            comp(n2) := idn(n1);
+        }        
+    }
+}
+
+
+export trLoc
+
+# The safety property:
+conjecture leader(X) & leader(Y) -> X = Y  # at most one leader

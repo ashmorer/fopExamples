@@ -1,0 +1,113 @@
+#lang ivy1.3
+
+
+################################################################################
+#
+# A module for axiomatizing a total order
+#
+################################################################################
+
+module total_order(r) = 
+{
+    axiom r(X,X)                        #reflexivity
+    axiom r(X,Y) & r(Y,Z) -> r(X,Z)     #transitivity
+    axiom r(X,Y) & r(Y,X) -> X = Y      #anti-symmetry
+    axiom r(X,Y) | r(Y,X)               #total order
+    axiom r(0,X)                        #minimal element 0
+}
+
+
+
+################################################################################
+#
+# Types, relations and functions describing states
+#
+################################################################################
+
+type node
+type id
+
+#Put nodes on an uninterpreted ring
+individual next(X:node) : node
+relation btw(X:node, Y:node, Z:node)
+
+relation le(X:id, Y:id)
+instantiate total_order(le)
+
+#Get personal id idn and comparison id comp.
+individual idn(X:node) : id
+individual comp(X:node): id
+
+axiom idn(X) ~= 0
+axiom idn(X)=idn(Y) -> X=Y
+
+################################################################################
+#
+# Protocol description
+#
+# One action, a local transition
+#
+################################################################################
+
+after init
+{
+    comp(X) := 0;
+}
+
+
+action trLoc(n1:node,n2:node) = {
+    assume next(n1)=n2;
+    if le(idn(n1),comp(n1))
+    {
+        #id(n)<=comp(n1), pass comp(n1)
+        comp(n2) := comp(n1);
+    }
+    else
+    {
+        #id(n1)>comp(n1), pass idn(n1)
+        comp(n2) := idn(n1);
+    }
+}
+
+#define trLoc but don't export it - next() needs to only ever be interpreted appropriately
+#export trLoc
+
+
+action trC(p:node, q1:node, q2:node, q3:node) = 
+{
+    #limit ourselves to small models
+    assume N=p|N=next(p)|N=q1|N=q2|N=q3;
+    
+    #finite instantiation of ring axioms
+    assume ((W=p|W=next(p)|W=q1|W=q2|W=q3) & 
+            (X=p|X=next(p)|X=q1|X=q2|X=q3) &
+            (Y=p|Y=next(p)|Y=q1|Y=q2|Y=q3) & 
+            (Z=p|Z=next(p)|Z=q1|Z=q2|Z=q3)) ->
+            (   (btw(X,Y,Z) -> btw(Y,Z,X)) &
+                (btw(X,Y,Z) -> ~btw(X,Z,Y)) &
+                ((X~=Y & X~=Z & Y~=Z) -> (btw(X,Y,Z) | btw(X,Z,Y))) &
+                ((btw(W,X,Y) & btw(W,Y,Z)) -> btw(W,X,Z)));
+    #assume ((Z=q1|Z=q2|Z=q3) & Z~=p & Z~=next(p)) -> btw(p,next(p),Z);
+    assume q1~=p & q1~=next(p) -> btw(p,next(p),q1);
+    assume q2~=p & q2~=next(p) -> btw(p,next(p),q2);
+    assume q3~=p & q3~=next(p) -> btw(p,next(p),q3);
+
+    assume  btw(q1,q2,q3);
+    call trLoc(p,next(p));
+}
+
+export trC
+
+
+#expect to fail
+#conjecture [noLeaders] ~(comp(X) = idn(X))
+
+# The safety property:
+conjecture [safety]  btw(X,Y,Z) -> ((comp(X) = idn(X) & comp(Y) = idn(Y)) -> X = Y)  # at most one leader
+
+#helper invariants
+conjecture [maxId] btw(X,Y,Z) -> (comp(X) = idn(X) -> (le(idn(Y),idn(X)) & le(idn(Z),idn(X))))
+conjecture [bypass] btw(X,Y,Z) -> (idn(X)=comp(Z) -> le(idn(Y),idn(X)))
+
+
+
