@@ -1,4 +1,4 @@
-#lang ivy1.3
+#lang ivy1.7
 
 #define red/black node types and colour field to receive
 type node
@@ -15,33 +15,33 @@ individual right(X:node): node
 #axiomatize left/right
 axiom black(X) <-> ~red(X)  #at most one colour
 axiom black(X) | red(X)     #at least one colour
-axiom black(X) <-> (red(left(X)) & red(right(X)))
+axiom black(X) <-> (red(left(X)) & red(right(X))) #leaves EPR... must run with complete=fo option to run.
 axiom red(X) <-> (black(left(X)) & black(right(X)))
 
 #axiom red(X) -> ~red(right(X))
 
 
 #give var field to r/b nodes
-individual var(X:node) : colour
+individual var1(X:node) : colour
 
 after init
 {
-    var(X) := 0;
+    var1(X) := 0;
 }
 
 action t(n1:node,n2:node) = {
     assume right(n1)=n2;
     if(black(n1))
     {
-        var(n2) := r
+        var1(n2) := r
     }
     else
     {
-        var(n2) := b
+        var1(n2) := b
     }
 }
 
 export t
 
 #Safety property
-conjecture red(X) -> var(X)~=b
+conjecture red(X) -> var1(X)~=b
