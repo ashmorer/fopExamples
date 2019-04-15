@@ -1,0 +1,54 @@
+#lang ivy 1.7
+
+type node
+
+relation undir(X:node, Y:node)
+
+axiom undir(X,Y) -> undir(Y,X)
+
+relation dir(X:node, Y:node)
+relation leader(X:node)
+relation btw(X:node, Y:node, Z:node)
+relation noPath(X:node, Y:node, Z:node)
+
+axiom (btw(X,Y,Z) -> (~btw(X,Z,Y) & ~btw(Y,X,Z) & ~btw(Y,Z,X) & ~btw(Z,X,Y)))
+axiom ((btw(W,X,Y) & btw(W,Z,Y)) -> ~btw(X,W,Z))
+axiom undir(X,Y) -> (btw(X,Y,Z) | btw(Z,X,Y))
+axiom exists X,Y:node. undir(X,Y)
+
+after init
+{
+    assume ~dir(X,Y);
+    assume ~leader(X);
+}
+
+action setLeader(p:node) = {
+    if forall Z:node. (dir(Z,p) | ~undir(p,Z))
+    {
+        leader(p) := true;
+    }
+}
+
+action setParent(n1:node, n2:node) =
+{
+    assume undir(n1,n2) & n1~=n2;
+    #if n2 could be n1's parent and has n2 is n1's unambiguous choice for parent.
+    if ~dir(n2,n1) & forall X:node. (~undir(n1,X) | dir(X,n1) | X=n2)
+    {
+        dir(n1,n2) := true;
+    }
+}   
+
+export setLeader
+export setParent
+
+
+conjecture [safety] (leader(X) & leader(Y)) -> X=Y
+
+#helper invariants
+conjecture [oneDir]         dir(X,Y) -> ~dir(Y,X)
+conjecture [leadNoFollow]   leader(X) -> ~dir(X,Y)
+conjecture [leadParent]     (leader(X) & undir(Y,X)) -> dir(Y,X)
+conjecture [oneParent]      (dir(X,Y) & dir(X,Z)) -> Y=Z
+conjecture [leafParent]     (dir(X,Y) & undir(X,Z) & Y~=Z) -> dir(Z,X)
+

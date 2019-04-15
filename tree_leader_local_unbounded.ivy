@@ -1,0 +1,70 @@
+#lang ivy 1.7
+
+type node
+
+relation undir(X:node, Y:node)
+
+relation dir(X:node, Y:node)
+relation leader(X:node)
+relation btw(X:node, Y:node, Z:node)
+
+
+after init
+{
+    assume ~dir(X,Y);
+    assume ~leader(X);
+}
+
+action setLeader(p:node) = {
+    if forall Z:node. (dir(Z,p) | ~undir(p,Z))
+    {
+        leader(p) := true;
+    }
+}
+
+action setParent(n1:node, n2:node) =
+{
+    assume undir(n1,n2) & n1~=n2;
+    #if n2 could be n1's parent and has n2 is n1's unambiguous choice for parent.
+    if ~dir(n2,n1) & forall X:node. (~undir(n1,X) | dir(X,n1) | X=n2)
+    {
+        dir(n1,n2) := true;
+    }
+}   
+
+action trLoc(p:node,p1:node) =
+{
+    call setLeader(p);
+    call setParent(p,p1);
+}
+
+action trC(p:node, p1:node, q1:node, q2:node, q3:node) = {
+    #limit ourselves to small models... ish. Now it does have arbitrary degree.
+    assume N=p|undir(N,p)|N=q1|N=q2|N=q3;
+    assume undir(p,p1);
+    assume ((W=p|undir(W,p)|W=q1|W=q2|W=q3) & 
+            (X=p|undir(X,p)|X=q1|X=q2|X=q3) &
+            (Y=p|undir(Y,p)|Y=q1|Y=q2|Y=q3) & 
+            (Z=p|undir(Z,p)|Z=q1|Z=q2|Z=q3)) ->
+            (    (btw(X,Y,Z) -> (~btw(X,Z,Y) & ~btw(Y,X,Z) & ~btw(Y,Z,X) & ~btw(Z,X,Y))) &
+                 ((btw(W,X,Z) & btw(W,Y,Z)) -> ~btw(X,Z,Y)) &
+                 (undir(X,Y) -> undir(Y,X))
+            );
+    assume undir(X,Y) -> (btw(X,Y,Z) | btw(Z,X,Y));
+    assume btw(q1,q2,q3);
+    call trLoc(p,p1);
+}
+
+export trC
+
+
+
+conjecture [safety] (leader(X) & leader(Y)) -> X=Y
+
+#helper invariants
+conjecture [oneDir]         dir(X,Y) -> ~dir(Y,X)
+conjecture [leadNoFollow]   leader(X) -> ~dir(X,Y)
+conjecture [leadParent]     (leader(X) & undir(Y,X)) -> dir(Y,X)
+conjecture [oneParent]      (dir(X,Y) & dir(X,Z)) -> Y=Z
+conjecture [leafParent]     (dir(X,Y) & undir(X,Z) & Y~=Z) -> dir(Z,X)
+
