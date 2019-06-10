@@ -1,4 +1,4 @@
-#lang ivy1.3
+#lang ivy1.7
 
 
 ################################################################################
@@ -59,18 +59,13 @@ individual comp(X:node): id
 
 #leader relation is true exactly when idn=comp
 relation leader(N:node)
-axiom leader(N) <-> idn(N) = comp(N)
-
-
-#initial state --> 1) ids unique, 2) id>comp all the time
-
 
 
 ################################################################################
 #
 # Protocol description
 #
-# Two action: send and receive
+# Local transition given here
 #
 ################################################################################
 
@@ -86,7 +81,11 @@ action trLoc = {
         {
             #id(n1)>comp(n1), pass idn(n1)
             comp(n2) := idn(n1);
-        }        
+        };
+        if comp(n2)=idn(n2)
+        {
+            leader(n2) := true;
+        }
     }
 }
 
