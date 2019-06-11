@@ -10,6 +10,7 @@ relation path(X:node, Y:node)
 
 # edge is symmetric 
 axiom edge(X,Y) -> edge(Y,X)
+# axiom ~edge(X, X)
 
 # true iff the edge between X and Y is directed X -> Y (Y is X's parent)
 relation parent(X:node, Y:node)
@@ -41,9 +42,9 @@ action setParent(n1:node, n2:node) =
 {
     assume edge(n1, n2) & n1 ~= n2;
     #if n2 could be n1's parent and has n2 is n1's unambiguous choice for parent.
-    if ~parent(n2, n1) & forall X:node. (edge(X,n1) -> (parent(X,n1) | X=n2))
+    if ~parent(n2, n1) & forall X:node . (X ~= n2 -> (edge(X, n1) -> parent(X, n1)))  
     {
-        parent(n1,n2) := true;
+        parent(n1, n2) := true;
     }
 }   
 
@@ -54,22 +55,28 @@ action trLoc(p:node, p1:node, p2:node, p3:node) =
     {
         if *
         {
-            call setParent(p,p1);
+            call setParent(p, p1);
         }   
         else
         {
-            call setParent(p,p2);
+            call setParent(p, p2);
         }
     }
     else
     {
-        call setParent(p,p3);
+        call setParent(p, p3);
     }
 }
 
-action trC(p:node,p1:node,p2:node,p3:node, q1:node, q2:node, q3:node) = {
+
+#btw is symmetric
+#axiom (btw(X,Y,Z) -> btw(Z,Y,X));
+#parents are a kind of ancestor
+#axiom (parent(X, Y) -> ancestor(X, Y);
+
+action trC(p:node, p1:node, p2:node, p3:node, q1:node, q2:node, q3:node) = {
     #local neighbourhood of p
-    assume edge(p,p1) & edge(p,p2) & edge(p,p3);
+    assume edge(p, p1) & edge(p, p2) & edge(p, p3);
     
     #btw is symmetric
     assume (btw(X,Y,Z) -> btw(Z,Y,X));
@@ -77,15 +84,17 @@ action trC(p:node,p1:node,p2:node,p3:node, q1:node, q2:node, q3:node) = {
     #parents are a kind of ancestor
     assume (parent(X,Y) -> ancestor(X,Y));
     
-    #connectedness assumption instantiated on p,p1,p2,p3,q1,q2,q3
-    #forall x: exists y: x~=y & path(x,y)
-    assume ((path(X,p)  &  X~=p) | 
-            (path(X,p1) & X~=p1) |  
-            (path(X,p2) & X~=p2) | 
-            (path(X,p3) & X~=p3) | 
-            (path(X,q1) & X~=q1) | 
-            (path(X,q2) & X~=q2) | 
-            (path(X,q3) & X~=q3));
+    # all the nodes in the neighbourhood are connected to something else in the neighbourhood
+    # and not necessarily directly connected (i.e., no edges between them, but there is a path)
+    # the intended meaning of X is to range over p, {p_i | 1 <= i <= 3} , {q_i | 1 <= i <= 3}
+    #forall X: exists Y: X ~= Y & path(X, Y)
+    assume ((path(X, p)  & X ~= p) | 
+            (path(X, p1) & X ~= p1) |  
+            (path(X, p2) & X ~= p2) | 
+            (path(X, p3) & X ~= p3) | 
+            (path(X, q1) & X ~= q1) | 
+            (path(X, q2) & X ~= q2) | 
+            (path(X, q3) & X ~= q3));
             
     #all processes y are in neighbourhood of p, or are on p1, p2, or p3 branch of tree.
     assume  (btw(p,p1,Y) | btw(p,p2,Y) | btw(p,p3,Y) | Y=p1 | Y=p2 | Y=p3 | Y = p);
@@ -107,5 +116,6 @@ conjecture [safety] (leader(X) & leader(Y)) -> X=Y
 conjecture [oneparent] ancestor(X,Y) -> ~ancestor(Y,X)
 conjecture [leadNoFollow] leader(X) -> ~ancestor(X,Y)
 conjecture [parentbtw] (btw(X,Y,Z) & ancestor(Y,Z)) -> ancestor(X,Y)
+# maybe call it acyclic
 conjecture [parentTrans] (ancestor(X,Y) & ancestor(Y,Z)) -> ~ancestor(Z,X)
 
