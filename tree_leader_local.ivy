@@ -8,9 +8,9 @@ relation edge(X:node, Y:node)
 # true iff there is a path between X and Y that does not include some nodes
 relation path(X:node, Y:node)
 
-# edge is symmetric 
+# edge is symmetric and has no self-loops
 axiom edge(X,Y) -> edge(Y,X)
-# axiom ~edge(X, X)
+axiom ~edge(X, X)
 
 # true iff the edge between X and Y is directed X -> Y (Y is X's parent)
 relation parent(X:node, Y:node)
@@ -23,6 +23,9 @@ relation leader(X:node)
 
 # true if (a) distinct(X, Y, Z) , and (b) Y is on the unique path between X and Z
 relation btw(X:node, Y:node, Z:node)
+
+#btw is symmetric
+axiom (btw(X,Y,Z) -> btw(Z,Y,X))
 
 after init
 {
@@ -69,21 +72,13 @@ action trLoc(p:node, p1:node, p2:node, p3:node) =
 }
 
 
-#btw is symmetric
-#axiom (btw(X,Y,Z) -> btw(Z,Y,X));
-#parents are a kind of ancestor
-#axiom (parent(X, Y) -> ancestor(X, Y);
-
 action trC(p:node, p1:node, p2:node, p3:node, q1:node, q2:node, q3:node) = {
     #local neighbourhood of p
     assume edge(p, p1) & edge(p, p2) & edge(p, p3);
     
-    #btw is symmetric
-    assume (btw(X,Y,Z) -> btw(Z,Y,X));
-    
-    #parents are a kind of ancestor
-    assume (parent(X,Y) -> ancestor(X,Y));
-    
+    #parents are a kind of ancestor -- this cannot be pushed to a further out context since parent is a modified predicate
+    assume parent(X,Y) -> ancestor(X,Y);
+   
     # all the nodes in the neighbourhood are connected to something else in the neighbourhood
     # and not necessarily directly connected (i.e., no edges between them, but there is a path)
     # the intended meaning of X is to range over p, {p_i | 1 <= i <= 3} , {q_i | 1 <= i <= 3}
@@ -112,10 +107,9 @@ export trC
 
 conjecture [safety] (leader(X) & leader(Y)) -> X=Y
 
-#new helpers
+#helpers
 conjecture [oneparent] ancestor(X,Y) -> ~ancestor(Y,X)
 conjecture [leadNoFollow] leader(X) -> ~ancestor(X,Y)
 conjecture [parentbtw] (btw(X,Y,Z) & ancestor(Y,Z)) -> ancestor(X,Y)
-# maybe call it acyclic
-conjecture [parentTrans] (ancestor(X,Y) & ancestor(Y,Z)) -> ~ancestor(Z,X)
+conjecture [acyclic] (ancestor(X,Y) & ancestor(Y,Z)) -> ~ancestor(Z,X)
 
