@@ -1,0 +1,164 @@
+#lang ivy 1.7
+
+type node
+type env
+
+# true iff node X is a member of local environment Y
+relation member(X:node, Y:env)
+
+# true iff there is an edge between X and Y
+relation edge(X:node, Y:node)
+#axiom ~edge(X,X)
+axiom edge(X,Y) -> edge(Y,X)
+
+# true if (a) distinct(X, Y, Z) , and (b) Y is on the unique path between X and Z
+relation btw(X:node, Y:node, Z:node)
+
+#btw axioms
+axiom btw(X,Y,Z) -> (X~=Y & X~=Z & Y~=Z)
+axiom btw(X,Y,Z) -> btw(Z,Y,X)
+#axiom btw(X,Y,Z) -> ~btw(X,Z,Y)
+axiom (btw(W,X,Y) & btw(W,Y,Z)) -> btw(W,X,Z)
+axiom (btw(V,W,X) & btw(W,X,Y) & btw(V,Y,Z)) -> btw(X,Y,Z)
+
+# true iff X~=Y, X,Y are members of E, and there is an X,Y-path such that the internal nodes of the path and environment E are disjoint
+relation path(X:node, Y:node, E:env)
+#axiom path(X,Y,E) -> path(Y,X,E)
+axiom member(Y,E) & btw(X,Y,Z) -> ~path(X,Z,E)
+#axiom path(X,Y,E) -> (member(X,E) & member(Y,E))
+axiom (edge(X,Y) & member(X,E) & member(Y,E)) -> path(X,Y,E)
+axiom ~path(X,X,E)
+
+# true iff the edge between X and Y is directed X -> Y (Y is X's parent)
+relation parent(X:node, Y:node)
+
+# true iff path(X, Y, E) and the direction of all the parent relations is X --> Y (X has Y as an ancestor)
+relation ancestor(X:node, Y:node, E:env)
+
+# true if X is a leader
+relation leader(X:node)
+
+
+after init
+{
+    assume ~parent(X,Y);
+    assume ~ancestor(X, Y, E);
+    assume ~leader(X);
+    #assume (member(X,E) & member(Y,E) & edge(X,Y)) -> path(X,Y,E);
+    assume (X~=Y & X~=Z & Y~=Z & path(X,Y,E) & path(Y,Z,E)) -> ~path(Z,X,E); #no triangles regardless of environment
+    #assume (path(X,Y,E) & ~path(X,Y,F)) -> (exists P:node. member(P, F) & btw(X,P,Y));
+}
+
+action setLeader(p:node) = {
+    if forall Z:node . (edge(Z, p) -> parent(Z, p))
+    {
+        leader(p) := true;
+    }
+}
+
+action setParent(n1:node, n2:node) =
+{
+    assume edge(n1, n2);
+    #if n2 could be n1's parent and has n2 is n1's unambiguous choice for parent.
+    if ~parent(n2, n1) & forall X:node . (X ~= n2 -> (edge(X, n1) -> parent(X, n1)))  
+    {
+        parent(n1, n2) := true;
+        ancestor(n1, n2, E) := true;
+    }
+}   
+
+action trLoc(p:node, p1:node, p2:node, p3:node) =
+{
+    call setLeader(p);
+    if *
+    {
+        if *
+        {
+            call setParent(p, p1);
+        }   
+        else
+        {
+            call setParent(p, p2);
+        }
+    }
+    else
+    {
+        call setParent(p, p3);
+    }
+}
+
+
+action trC(p:node, p1:node, p2:node, p3:node, q1:node, q2:node, q3:node, e:env) = {
+    #local neighbourhood of p
+    assume edge(p, p1) & edge(p, p2) & edge(p, p3);
+    #assume edge(p, X) -> (X = p1 | X = p2 | X = p3);
+    
+    #Suppose a CTI exists.
+    #Then it must exist in a single local neighbourhood e where we may observe it.
+    #No other environments are relevant, thus we may assume the only environment is the arbitrary e.
+    assume E=e;
+
+    #restrict environment e to be exactly the 7 relevant elements
+    assume member(p, e) & member(p1, e) & member(p2, e) & member(p3, e) & member(q1, e) & member(q2, e) & member(q3, e);
+    #assume member(X, e) -> (X = p | X = p1 | X = p2 | X = p3 | X = q1 | X = q2 | X = q3);
+    
+    #parents are a kind of ancestor -- this cannot be pushed to a further out context since parent is a modified predicate
+    assume (member(X,e) & member(Y,e) & parent(X,Y)) -> ancestor(X, Y, e);
+            
+    #all processes y are in neighbourhood of p, or are on p1, p2, or p3 branch of tree.
+    assume  (btw(p,p1,Y) | btw(p,p2,Y) | btw(p,p3,Y) | Y=p1 | Y=p2 | Y=p3 | Y = p);
+           
+    #if (forall Z: member(Z,e) -> ~btw(X,Z,Y)) -> path(X,Y,E)
+    assume (X~=Y & ~btw(X,p,Y) & ~btw(X,p1,Y) & ~btw(X,p2,Y) & ~btw(X,p3,Y) & ~btw(X,q1,Y) & ~btw(X,q2,Y) & ~btw(X,q3,Y)) -> path(X,Y,e);
+    #justification: There must exist an X,Y-path. 
+    #Thus we satisfy path(X,Y,e) iff there is no member of e between X,Y and X~=Y by dfn.
+    #We can explicitly iterate over all members of e and check this.
+    
+
+    #observing neighbourhood q1,q2,q3 satisfying btw
+    #assume btw(q1,q2,q3);
+    
+    
+    call trLoc(p,p1,p2,p3);
+}
+
+export trC
+
+
+
+conjecture [safety] (leader(X) & leader(Y)) -> X=Y
+
+#helpers
+conjecture [oneparent] ancestor(X,Y,E) -> ~ancestor(Y,X,E)
+conjecture [leadNoFollow] leader(X) -> ~ancestor(X,Y,E)
+#conjecture [acyclic] (ancestor(X,Y,E) & ancestor(Y,Z,F)) -> ~ancestor(Z,X,G)
+conjecture [parentbtw] (btw(X,Y,Z) & path(X,Y,E) & ancestor(Y,Z,E)) -> ancestor(X,Y,E)
+conjecture [pathPreReq] (ancestor(X,Y,E) -> path(X,Y,E))
+conjecture [acyclic2] (path(X,Y,E) & path(Y,Z,E)) -> ~path(Z,X,E)
+#conjecture [family] parent(X,Y) -> ancestor(X,Y,E)
+conjecture [localLink] (ancestor(X,Y,E) & edge(X,Y)) -> parent(X,Y)
+conjecture [leadersLead] (leader(X) & edge(Y,X)) -> parent(Y,X)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
